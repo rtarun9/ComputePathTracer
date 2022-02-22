@@ -15,7 +15,10 @@ namespace cpt
 	{
 		DirectX::XMFLOAT4 cameraPosition{DirectX::XMFLOAT4(0.0f, 0.0f, -1.0f, 1.0f)};
 		DirectX::XMFLOAT2 screenDimension{};
-		DirectX::XMFLOAT2 padding{};
+		DirectX::XMFLOAT3 randomNumbers{};
+		uint32_t padding;
+		DirectX::XMFLOAT4 padding2;
+		DirectX::XMFLOAT2 padding3;
 	};
 
 	// Currently, Keys and INPUT_MAP is unused.

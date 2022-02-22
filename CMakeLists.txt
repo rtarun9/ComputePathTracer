@@ -37,6 +37,7 @@ target_precompile_headers(${PROJECT_NAME}
     <cassert>
     <exception>
     <cmath>
+    <random>
 
     PRIVATE
     ${PROJECT_SOURCE_DIR}/Include/Pch.hpp
