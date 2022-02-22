@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+
+# VS data (along with the whole Bin directory)
+.vs/
+Bin/
+out/

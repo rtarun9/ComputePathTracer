@@ -29,11 +29,11 @@ namespace cpt
 
 		if (m_Keys[static_cast<int>(Keys::Left)])
 		{
-			m_ConstantBufferData.cameraPosition.x -= speed;
+			m_ConstantBufferData.cameraPosition.y -= speed;
 		}
 		else if (m_Keys[static_cast<int>(Keys::Right)])
 		{
-			m_ConstantBufferData.cameraPosition.x += speed;
+			m_ConstantBufferData.cameraPosition.y += speed;
 		}
 
 		if (m_Keys[static_cast<int>(Keys::Forward)])
@@ -45,14 +45,7 @@ namespace cpt
 			m_ConstantBufferData.cameraPosition.z += speed;
 		}
 
-		// Update Random number and send to save in constant buffer.
-		std::random_device randomDevice{};
-		std::mt19937 gen(randomDevice());
-		std::uniform_real_distribution<float> urd(0.0f, 10.0f);
-		
-		m_ConstantBufferData.randomNumbers.x = urd(gen);
-		m_ConstantBufferData.randomNumbers.y = urd(gen);
-		m_ConstantBufferData.randomNumbers.z = urd(gen);
+		m_ConstantBufferData.frameIndex = m_FrameIndex;
 
 		// TODO : Map once, unmap at the end of apaplication if this approach is still being used.
 		D3D11_MAPPED_SUBRESOURCE mappedSubresource{};
