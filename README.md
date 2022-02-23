@@ -1,7 +1,6 @@
 # Compute Path Tracer
 
-A simple WIP real time path tracer using a single DX11 compute shader.
-Based on the "Ray tracing in a weekend book".
+Real time GPU path tracer using Direct3D11 Compute shaders. Inspired by the [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html) book.
 
-# Sample
-![](Assets/Screenshots/MaterialTest.png)
+# Showcase
+![](Assets/showcase.gif)

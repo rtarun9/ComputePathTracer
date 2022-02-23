@@ -27,22 +27,31 @@ namespace cpt
 		// Camera position calculations.
 		float speed = m_DeltaTIme * m_CameraSpeed;
 
-		if (m_Keys[static_cast<int>(Keys::Left)])
+		if (m_Keys[static_cast<int>(Keys::A)])
 		{
 			m_ConstantBufferData.cameraLookAt.x -= speed;
 		}
-		else if (m_Keys[static_cast<int>(Keys::Right)])
+		else if (m_Keys[static_cast<int>(Keys::D)])
 		{
 			m_ConstantBufferData.cameraLookAt.x += speed;
 		}
 
-		if (m_Keys[static_cast<int>(Keys::Forward)])
+		if (m_Keys[static_cast<int>(Keys::W)])
 		{
-			m_ConstantBufferData.cameraLookAt.z += speed;
+			m_ConstantBufferData.cameraLookAt.y += speed;
 		}
-		else if (m_Keys[static_cast<int>(Keys::Backward)])
+		else if (m_Keys[static_cast<int>(Keys::S)])
 		{
-			m_ConstantBufferData.cameraLookAt.z -= speed;
+			m_ConstantBufferData.cameraLookAt.y -= speed;
+		}
+
+		if (m_Keys[static_cast<int>(Keys::Up)])
+		{
+			m_ConstantBufferData.cameraFOV--;
+		}
+		else if (m_Keys[static_cast<int>(Keys::Down)])
+		{
+			m_ConstantBufferData.cameraFOV++;
 		}
 
 		m_ConstantBufferData.frameIndex = m_FrameIndex;
@@ -77,25 +86,37 @@ namespace cpt
 		{
 		case 'A':
 		{
-			m_Keys[static_cast<size_t>(Keys::Left)] = true;
+			m_Keys[static_cast<size_t>(Keys::A)] = true;
 			break;
 		}
 
 		case 'D':
 		{
-			m_Keys[static_cast<size_t>(Keys::Right)] = true;
+			m_Keys[static_cast<size_t>(Keys::D)] = true;
 			break;
 		}
 
 		case 'W':
 		{
-			m_Keys[static_cast<size_t>(Keys::Forward)] = true;
+			m_Keys[static_cast<size_t>(Keys::W)] = true;
 			break;
 		}
 
 		case 'S':
 		{
-			m_Keys[static_cast<size_t>(Keys::Backward)] = true;
+			m_Keys[static_cast<size_t>(Keys::S)] = true;
+			break;
+		}
+
+		case VK_UP:
+		{
+			m_Keys[static_cast<size_t>(Keys::Up)] = true;
+			break;
+		}
+
+		case VK_DOWN:
+		{
+			m_Keys[static_cast<size_t>(Keys::Down)] = true;
 			break;
 		}
 		}
@@ -107,25 +128,37 @@ namespace cpt
 		{
 		case 'A':
 		{
-			m_Keys[static_cast<size_t>(Keys::Left)] = false;
+			m_Keys[static_cast<size_t>(Keys::A)] = false;
 			break;
 		}
 
 		case 'D':
 		{
-			m_Keys[static_cast<size_t>(Keys::Right)] = false;
+			m_Keys[static_cast<size_t>(Keys::D)] = false;
 			break;
 		}
 
 		case 'W':
 		{
-			m_Keys[static_cast<size_t>(Keys::Forward)] = false;
+			m_Keys[static_cast<size_t>(Keys::W)] = false;
 			break;
 		}
 
 		case 'S':
 		{
-			m_Keys[static_cast<size_t>(Keys::Backward)] = false;
+			m_Keys[static_cast<size_t>(Keys::S)] = false;
+			break;
+		}
+
+		case VK_UP:
+		{
+			m_Keys[static_cast<size_t>(Keys::Up)] = false;
+			break;
+		}
+
+		case VK_DOWN:
+		{
+			m_Keys[static_cast<size_t>(Keys::Down)] = false;
 			break;
 		}
 		}
@@ -232,7 +265,7 @@ namespace cpt
 
 	void Engine::Present()
 	{
-		m_SwapChain->Present(0u, 0u);
+		m_SwapChain->Present(1u, 0u);
 
 		m_FrameIndex++;
 	}

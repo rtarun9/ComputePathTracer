@@ -1,13 +1,13 @@
 RWTexture2D<float3> renderTexture : register(u0);
 
-static const float T_MIN = 0.01f;
+static const float T_MIN = 0.0001f;
 static const float T_MAX = 1000000.0f;
 
-static const float RAY_BOUNCES = 400.0f;
+static const float RAY_BOUNCES = 450.0f;
 
-static const float SCENE_OBJECTS = 4;
+static const float SCENE_OBJECTS = 10;
 
-static const float SAMPLES_PER_PIXEL = 16;
+static const int SAMPLES_PER_PIXEL = 4;
 
 // Note : Materials and objects are set seperately but are of same size and the object index corresponds so the material index.
 static const int MATERIAL_NONE = -1;
@@ -21,9 +21,7 @@ cbuffer GlobalCBuffer : register(b0)
     float4 cameraLookAt;
     float2 screenDimensions;
     uint frameIndex;
-    float4 padding;
-    float4 padding2;
-    float padding3;
+    float cameraFOV;
 };
 
 float Random(float2 uv)
@@ -31,15 +29,15 @@ float Random(float2 uv)
     return frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);
 }
 
-float3 RandomVectorInSphere(float2 num)
+float3 RandomVectorInSphere(float3 randSeed)
 {
     float3 p = float3(0.0f, 0.0f, 0.0f);
     do
     {
-        //p = 2.0f * float3(Random(num.xx * frameIndex), Random(num.yy * frameIndex), Random(num.xy * frameIndex));
-        p = 2.0f * float3(Random(num.xx), Random(num.yy), Random(num.xy));
+        // Since 'Random' function never returns a value that is = 1, subtracting by float3(1) does not make sence.
+        p = 2.0f * float3(Random(randSeed.xy), Random(randSeed.yz), Random(randSeed.zx)) - float3(0.9f, 0.9f, 0.9f);
     }
-    while (length(p * p) >= 1.0f);
+    while (length(p * p) > 1.0f);
 
     return p;
 }
@@ -54,7 +52,7 @@ bool RefractRay(float3 incomingVector, float3 normal, float refractiveIndexRatio
     float desc = 1.0f - refractiveIndexRatio * refractiveIndexRatio * (1 - dt * dt);
     if (desc > 0.0f)
     {
-        refractedRay = refractiveIndexRatio * (v - normal * dt) - normal * sqrt(desc);
+        refractedRay = normalize(refractiveIndexRatio * (v - normal * dt) - normal * sqrt(desc));
         return true;
     }
 
@@ -218,29 +216,82 @@ Material CreateMaterial(float3 albedo, float value, int materialType)
     return material;
 }
 
-
-static Material MATERIALS[SCENE_OBJECTS] =
+struct Camera
 {
-    CreateMaterial(float3(0.8f, 0.6f, 0.8f), 0.0f, MATERIAL_DIFFUSE),
-    CreateMaterial(float3(1.0f, 0.5f, 0.5f), 0.0f, MATERIAL_METAL),
-    CreateMaterial(float3(1.0f, 1.0f, 1.0f), 1.5f, MATERIAL_DIELECTRIC),
-    CreateMaterial(float3(0.6f, 0.5f, 0.5f), 0.0f, MATERIAL_DIFFUSE),
+    float3 upperLeftCorner;
+    float3 horizontalExtents;
+    float3 verticalExtents;
+    float3 origin;
 };
 
+Camera CreateCamera()
+{
+    float halfTheta = radians(cameraFOV / 2.0f);
+    float halfHeight = tan(halfTheta);
+    float halfWidth = 2.0f * halfHeight;
+
+    float3 w = normalize(cameraLookAt.xyz - cameraPosition.xyz);
+    float3 u = normalize(cross(float3(0.0f, 1.0f, 0.0f), w));
+    float3 v = normalize(cross(w, u));
+  
+    Camera camera;
+    camera.origin = float3(0.0f, 0.0f, -1.0f);
+    camera.upperLeftCorner = u * halfWidth + v * halfHeight + w * cameraLookAt.z;
+
+    camera.horizontalExtents = float3(halfWidth * 2.0f, 0.0f, 0.0f);
+    camera.verticalExtents = float3(0.0f, halfHeight * 2.0f, 0.0f);
+
+    return camera;
+}
+
+Ray GetRay(Camera camera, float2 uv)
+{
+    Ray ray;
+    ray.origin = float3(camera.origin);
+    ray.direction = float3(camera.upperLeftCorner - uv.x * camera.horizontalExtents - uv.y * camera.verticalExtents - camera.origin);
+
+    return ray;
+}
+
+// Scene data.
+
 static Sphere SCENE_SPHERES[SCENE_OBJECTS] =
-{ 
+{
     CreateSphere(float3(0.0f, 0.0f, 1.0f), 0.5f, 0),
     CreateSphere(float3(1.0f, 0.0f, 1.0f), 0.5f, 1),
     CreateSphere(float3(-1.0f, 0.0f, 1.0f), 0.5f, 2),
-    CreateSphere(float3(0.0f, -100.45f, 1.0f), 100.0f, 3),
+    CreateSphere(float3(0.0f, -100.50, 1.0f), 100.0f, 3),
+
+    CreateSphere(float3(0.5f, -0.3f, 0.2f), 0.2f, 4),
+    CreateSphere(float3(-0.3f, -0.3f, 0.1f), 0.2f, 5),
+    CreateSphere(float3(1.2f, -0.3f, 0.4f), 0.2f, 6),
+
+    CreateSphere(float3(0.2f, -0.4f, 0.0f), 0.1f, 7),
+    CreateSphere(float3(-0.6f, -0.4f, 0.1f), 0.1f, 8),
+    CreateSphere(float3(1.2f, -0.3f, 0.4f), 0.25f, 6),
 };
 
+static Material MATERIALS[SCENE_OBJECTS] =
+{
+    CreateMaterial(float3(0.5f, 0.5f, 1.0f), 0.0f, MATERIAL_DIFFUSE),
+    CreateMaterial(float3(0.8f, 0.5f, 0.9f), 0.1f, MATERIAL_METAL),
+    CreateMaterial(float3(1.0f, 1.0f, 1.0f), 1.5f, MATERIAL_DIELECTRIC),
+    CreateMaterial(float3(0.7f, 0.7f, 0.7f), 0.0f, MATERIAL_DIFFUSE),
+
+    CreateMaterial(float3(0.3f, 0.8f, 0.6f), 0.0f, MATERIAL_DIFFUSE),
+    CreateMaterial(float3(0.9f, 0.4f, 0.4f), 0.3f, MATERIAL_METAL),
+    CreateMaterial(float3(1.0f, 0.7f, 0.0f), 0.0f, MATERIAL_METAL),
+
+    CreateMaterial(float3(0.6f, 0.1f, 0.5f), 0.0f, MATERIAL_DIFFUSE),
+    CreateMaterial(float3(0.6f, 0.4f, 0.8f), 0.2f, MATERIAL_METAL),
+    CreateMaterial(float3(1.0f, 0.7f, 0.0f), 0.0f, MATERIAL_METAL),
+};
 
 void ScatterDiffuse(inout Ray ray, inout HitRecord hr, inout float3 color, int materialIndex)
 {
     color *= MATERIALS[materialIndex].albedo;
     ray.origin = hr.position;
-    ray.direction = hr.position + hr.normal + RandomVectorInSphere(hr.normal.xy);
+    ray.direction = hr.position + hr.normal + RandomVectorInSphere(hr.normal);
     ray.direction = ray.direction - hr.position;
     ray.direction = normalize(ray.direction);
 }
@@ -249,7 +300,10 @@ void ScatterMetal(inout Ray ray, inout HitRecord hr, inout float3 color, int mat
 {
     color *= MATERIALS[hr.objectID].albedo;
     ray.origin = hr.position;
-    float3 scatteredDirection = reflect(ray.direction, hr.normal + MATERIALS[materialIndex].value * RandomVectorInSphere(ray.direction.xy));
+
+    float3 scatteredDirection = reflect(ray.direction, hr.normal);
+
+    scatteredDirection += MATERIALS[materialIndex].value * RandomVectorInSphere(hr.normal);
     
     if (dot(scatteredDirection, hr.normal) > 0)
     {
@@ -259,7 +313,9 @@ void ScatterMetal(inout Ray ray, inout HitRecord hr, inout float3 color, int mat
 
 void ScatterDielectric(inout Ray ray, inout HitRecord hr, inout float3 color, int materialIndex)
 {
-    color *= MATERIALS[materialIndex].albedo;
+    // Dielectics never absort only of the light, hence color remains unchanged.
+    //color *= MATERIALS[materialIndex].albedo;
+
     float3 normalOutward = float3(0.0f, 0.0f, 0.0f);
     float3 reflectedRay = reflect(ray.direction, hr.normal);
     float3 refractedRay = float3(0.0f, 0.0f, 0.0f);
@@ -268,30 +324,32 @@ void ScatterDielectric(inout Ray ray, inout HitRecord hr, inout float3 color, in
     float refelctionProbability = 0.0f;
 
     float refractiveIndexRatio = 0.0f;
-    if (dot(ray.direction, hr.normal) > 0.0f)
+
+    float3 inRayDirection = ray.direction;
+
+    if (dot(ray.direction, hr.normal) >= 0.0f)
     {
         normalOutward = -hr.normal;
         refractiveIndexRatio = MATERIALS[materialIndex].value;
-        cosine = MATERIALS[materialIndex].value * dot(ray.direction, hr.normal) / length(ray.direction);
-
+        cosine = MATERIALS[materialIndex].value * dot(inRayDirection, hr.normal) / length(inRayDirection);
     }
     else
     {
         normalOutward = hr.normal;
         refractiveIndexRatio = 1.0f / MATERIALS[materialIndex].value;
-        cosine = -dot(ray.direction, hr.normal) / length(ray.direction);
+        cosine = -dot(inRayDirection, hr.normal) / length(inRayDirection);
     }
 
-    if (RefractRay(ray.direction, normalOutward, refractiveIndexRatio, refractedRay))
+    if (RefractRay(inRayDirection, normalOutward, refractiveIndexRatio, refractedRay))
     {
-        refelctionProbability = Schlick(cosine, MATERIALS[materialIndex].value);
+        refelctionProbability = Schlick(cosine, refractiveIndexRatio);
     }
     else
     {
-        refelctionProbability = 1.1f;
+        refelctionProbability = 1.0;
     }
 
-    if (Random(hr.normal.xy) < refelctionProbability)
+    if (Random(inRayDirection.xy) < refelctionProbability)
     {
         ray = CreateRay(hr.position, reflectedRay);
     }
@@ -299,7 +357,6 @@ void ScatterDielectric(inout Ray ray, inout HitRecord hr, inout float3 color, in
     {
         ray = CreateRay(hr.position, refractedRay);
     }
-
 }
 
 void Scatter(inout Ray ray, inout HitRecord hr, inout float3 color, int materialIndex)
@@ -380,46 +437,31 @@ float3 GetColor(Ray ray)
     return color;
 }
 
-Ray GenerateRay(uint3 dispatchThreadID, float x, float y)
+Ray GenerateRay(uint3 dispatchThreadID, Camera camera, float2 xy)
 {
      // PixelCoords are in the range of 0..1 with (0, 0) being the top left corner.
     float2 pixelCoords = (dispatchThreadID.xy) / screenDimensions;
-    
-    pixelCoords += float2(x, y) / screenDimensions;
+    float2 randomVec = xy / screenDimensions;
 
-    // Centering pixelCoords so that (0, 0) appears in the middle of the screen and extents are -2..2 on x and -1..1 on x. 
-    // This is assuming that window dimesions will have aspect ratio of 0.5f, which is default behavior.
-    pixelCoords = pixelCoords * 2;
-    pixelCoords = pixelCoords - float2(1.0f, 1.0f);
-
-    pixelCoords.x = pixelCoords.x * 2.0f;
-
-    // Invert pixelCoord.y so that window up direction is the positive y axis.
-    pixelCoords.y *= -1.0f;
-
-    // Main Render logic.
-
-    Ray ray = CreateRay(cameraPosition.xyz, normalize(cameraLookAt.xyz + float3(pixelCoords.xy, 1.0f) - cameraPosition.xyz));
+    Ray ray = GetRay(camera, pixelCoords + randomVec);
     return ray;
 }
 
 [numthreads(8, 8, 1)]
 void CsMain(uint3 dispatchThreadID : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex)
 {
-    Ray ray = GenerateRay(dispatchThreadID, 0, 0);
+    Camera camera = CreateCamera();
+    camera.origin = cameraPosition;
 
     float3 result = float3(0.0f, 0.0f, 0.0f);
-
-    for (int i = 0; i < SAMPLES_PER_PIXEL; i++)
+    for (int i = 0; i < SAMPLES_PER_PIXEL; ++i)
     {
-        float randomX = Random(ray.direction.xy);
-        float randomY = Random(ray.direction.yx);
-
-        Ray antiAliasingRay = GenerateRay(dispatchThreadID, randomX, randomY);
-        result += GetColor(antiAliasingRay);
+        float2 randomSeed = float2(Random(dispatchThreadID.xx), Random(dispatchThreadID.yy));
+        Ray ray = GenerateRay(dispatchThreadID, camera, randomSeed);
+        result += GetColor(ray);
     }
 
     result /= SAMPLES_PER_PIXEL;
-  
+
     renderTexture[dispatchThreadID.xy] = result;
 }
