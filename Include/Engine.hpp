@@ -13,7 +13,8 @@ namespace cpt
 
 	struct ConstantBufferData
 	{
-		DirectX::XMFLOAT4 cameraPosition{DirectX::XMFLOAT4(0.0f, 0.0f, -1.0f, 1.0f)};
+		DirectX::XMFLOAT4 cameraPosition{DirectX::XMFLOAT4(0.0f, 0.5f, -1.0f, 1.0f)};
+		DirectX::XMFLOAT4 cameraLookAt{DirectX::XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f)};
 		DirectX::XMFLOAT2 screenDimension{};
 		uint32_t frameIndex;
 		DirectX::XMFLOAT4 padding;

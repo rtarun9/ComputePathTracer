@@ -29,20 +29,20 @@ namespace cpt
 
 		if (m_Keys[static_cast<int>(Keys::Left)])
 		{
-			m_ConstantBufferData.cameraPosition.y -= speed;
+			m_ConstantBufferData.cameraLookAt.x -= speed;
 		}
 		else if (m_Keys[static_cast<int>(Keys::Right)])
 		{
-			m_ConstantBufferData.cameraPosition.y += speed;
+			m_ConstantBufferData.cameraLookAt.x += speed;
 		}
 
 		if (m_Keys[static_cast<int>(Keys::Forward)])
 		{
-			m_ConstantBufferData.cameraPosition.z -= speed;
+			m_ConstantBufferData.cameraLookAt.z += speed;
 		}
 		else if (m_Keys[static_cast<int>(Keys::Backward)])
 		{
-			m_ConstantBufferData.cameraPosition.z += speed;
+			m_ConstantBufferData.cameraLookAt.z -= speed;
 		}
 
 		m_ConstantBufferData.frameIndex = m_FrameIndex;
@@ -218,7 +218,7 @@ namespace cpt
 		wrl::ComPtr<ID3DBlob> shaderBlob;
 		wrl::ComPtr<ID3DBlob> errorBlob;
 
-		HRESULT hr = D3DCompileFromFile(L"../Shaders/RayTracerCS.hlsl", nullptr, nullptr, "CsMain", "cs_5_0", 0, 0, &shaderBlob, &errorBlob);
+		HRESULT hr = D3DCompileFromFile(L"../Shaders/PathTracerCS.hlsl", nullptr, nullptr, "CsMain", "cs_5_0", 0, 0, &shaderBlob, &errorBlob);
 		if (FAILED(hr))
 		{
 			const char* errorMessage = (const char*)errorBlob->GetBufferPointer();
