@@ -4,6 +4,7 @@
 
 namespace cpt
 {
+	// Application config.
 	struct Config
 	{
 		std::wstring title{};
@@ -11,6 +12,7 @@ namespace cpt
 		uint32_t height{};
 	};
 
+	// Engine currently uses a single constant buffer to pass data to the Compute Shader.
 	struct ConstantBufferData
 	{
 		DirectX::XMFLOAT4 cameraPosition{ DirectX::XMFLOAT4(0.0f, 0.0f, -1.0f, 1.0f) };
@@ -20,7 +22,7 @@ namespace cpt
 		float cameraFOV{90.0f};
 	};
 
-	// Currently, Keys and INPUT_MAP is unused.
+	// These keys map to WIN32 key codes.
 	enum class Keys : uint8_t
 	{
 		A,
@@ -43,8 +45,7 @@ namespace cpt
 		void OnCompute();
 		void OnDestroy();
 		
-		void OnKeyDown(uint8_t keycode);
-		void OnKeyUp(uint8_t keycode);
+		void OnKeyAction(uint8_t keycode, bool isKeyDown);
 
 		uint32_t GetWidth() const;
 		uint32_t GetHeight() const;
@@ -80,7 +81,7 @@ namespace cpt
 		std::chrono::high_resolution_clock m_Clock;
 		std::chrono::high_resolution_clock::time_point m_PreviousTimePoint;
 		std::chrono::high_resolution_clock::time_point m_CurrentTimePoint;
-		double m_DeltaTIme{};
+		double m_DeltaTime{};
 
 		// Application data.
 		Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_UAV;
@@ -90,8 +91,8 @@ namespace cpt
 
 		ConstantBufferData m_ConstantBufferData{};
 
-		// TODO : Put this data in seperate camera class.
 		float m_CameraSpeed{ 2.5f };
+
 		std::array<bool, static_cast<size_t>(Keys::TotalKeys)> m_Keys{};
 	};
 }

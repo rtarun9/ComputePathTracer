@@ -6,6 +6,7 @@ namespace cpt
 {
 	class Engine;
 
+	// Handle the window creation and window message handling.
 	class Application
 	{
 	public:

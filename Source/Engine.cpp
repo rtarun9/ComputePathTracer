@@ -21,11 +21,11 @@ namespace cpt
 	{
 		// Deltatime calculation.
 		m_CurrentTimePoint = m_Clock.now();
-		m_DeltaTIme = (m_CurrentTimePoint - m_PreviousTimePoint).count() * 1e-9;
+		m_DeltaTime = (m_CurrentTimePoint - m_PreviousTimePoint).count() * 1e-9;
 		m_PreviousTimePoint = m_CurrentTimePoint;
 
 		// Camera position calculations.
-		float speed = m_DeltaTIme * m_CameraSpeed;
+		float speed = m_DeltaTime * m_CameraSpeed;
 
 		if (m_Keys[static_cast<int>(Keys::A)])
 		{
@@ -80,85 +80,43 @@ namespace cpt
 	}
 
 	// Needs to be rewritten using some sort of input mapping.
-	void Engine::OnKeyDown(uint8_t keycode)
+	void Engine::OnKeyAction(uint8_t keycode, bool isKeyDown)
 	{
 		switch (keycode)
 		{
 		case 'A':
 		{
-			m_Keys[static_cast<size_t>(Keys::A)] = true;
+			m_Keys[static_cast<size_t>(Keys::A)] = isKeyDown;
 			break;
 		}
 
 		case 'D':
 		{
-			m_Keys[static_cast<size_t>(Keys::D)] = true;
+			m_Keys[static_cast<size_t>(Keys::D)] = isKeyDown;
 			break;
 		}
 
 		case 'W':
 		{
-			m_Keys[static_cast<size_t>(Keys::W)] = true;
+			m_Keys[static_cast<size_t>(Keys::W)] = isKeyDown;
 			break;
 		}
 
 		case 'S':
 		{
-			m_Keys[static_cast<size_t>(Keys::S)] = true;
+			m_Keys[static_cast<size_t>(Keys::S)] = isKeyDown;
 			break;
 		}
 
 		case VK_UP:
 		{
-			m_Keys[static_cast<size_t>(Keys::Up)] = true;
+			m_Keys[static_cast<size_t>(Keys::Up)] = isKeyDown;
 			break;
 		}
 
 		case VK_DOWN:
 		{
-			m_Keys[static_cast<size_t>(Keys::Down)] = true;
-			break;
-		}
-		}
-	}
-
-	void Engine::OnKeyUp(uint8_t keycode)
-	{
-		switch (keycode)
-		{
-		case 'A':
-		{
-			m_Keys[static_cast<size_t>(Keys::A)] = false;
-			break;
-		}
-
-		case 'D':
-		{
-			m_Keys[static_cast<size_t>(Keys::D)] = false;
-			break;
-		}
-
-		case 'W':
-		{
-			m_Keys[static_cast<size_t>(Keys::W)] = false;
-			break;
-		}
-
-		case 'S':
-		{
-			m_Keys[static_cast<size_t>(Keys::S)] = false;
-			break;
-		}
-
-		case VK_UP:
-		{
-			m_Keys[static_cast<size_t>(Keys::Up)] = false;
-			break;
-		}
-
-		case VK_DOWN:
-		{
-			m_Keys[static_cast<size_t>(Keys::Down)] = false;
+			m_Keys[static_cast<size_t>(Keys::Down)] = isKeyDown;
 			break;
 		}
 		}

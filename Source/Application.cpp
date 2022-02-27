@@ -120,7 +120,7 @@ namespace cpt
 
 			case WM_KEYDOWN:
 			{
-				engine->OnKeyDown(static_cast<uint8_t>(wParam));
+				engine->OnKeyAction(static_cast<uint8_t>(wParam), true);
 
 
 				if (wParam == VK_ESCAPE)
@@ -133,7 +133,7 @@ namespace cpt
 
 			case WM_KEYUP:
 			{
-				engine->OnKeyUp(static_cast<uint8_t>(wParam));
+				engine->OnKeyAction(static_cast<uint8_t>(wParam), false);
 				break;
 			}
 
