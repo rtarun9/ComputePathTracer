@@ -82,43 +82,9 @@ namespace cpt
 	// Needs to be rewritten using some sort of input mapping.
 	void Engine::OnKeyAction(uint8_t keycode, bool isKeyDown)
 	{
-		switch (keycode)
+		if (size_t keyCodeValue = EnumClassValue(INPUT_MAP[keycode]); INPUT_MAP.find(keycode) != end(INPUT_MAP))
 		{
-		case 'A':
-		{
-			m_Keys[static_cast<size_t>(Keys::A)] = isKeyDown;
-			break;
-		}
-
-		case 'D':
-		{
-			m_Keys[static_cast<size_t>(Keys::D)] = isKeyDown;
-			break;
-		}
-
-		case 'W':
-		{
-			m_Keys[static_cast<size_t>(Keys::W)] = isKeyDown;
-			break;
-		}
-
-		case 'S':
-		{
-			m_Keys[static_cast<size_t>(Keys::S)] = isKeyDown;
-			break;
-		}
-
-		case VK_UP:
-		{
-			m_Keys[static_cast<size_t>(Keys::Up)] = isKeyDown;
-			break;
-		}
-
-		case VK_DOWN:
-		{
-			m_Keys[static_cast<size_t>(Keys::Down)] = isKeyDown;
-			break;
-		}
+			m_Keys[keyCodeValue] = isKeyDown;
 		}
 	}
 

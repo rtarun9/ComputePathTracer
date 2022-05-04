@@ -18,7 +18,7 @@ namespace cpt
 		DirectX::XMFLOAT4 cameraPosition{ DirectX::XMFLOAT4(0.0f, 0.0f, -1.0f, 1.0f) };
 		DirectX::XMFLOAT4 cameraLookAt{ DirectX::XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f) };
 		DirectX::XMFLOAT2 screenDimension{};
-		uint32_t frameIndex;
+		uint32_t frameIndex{};
 		float cameraFOV{90.0f};
 	};
 
@@ -32,6 +32,17 @@ namespace cpt
 		Up,
 		Down,
 		TotalKeys
+	};
+
+	// Mapping WIN32 key codes to Key enum class.
+	static std::map<uint8_t, Keys> INPUT_MAP
+	{
+		{'W', Keys::W},
+		{'A', Keys::A},
+		{'S', Keys::S},
+		{'D', Keys::D},
+		{VK_UP, Keys::Up},
+		{VK_DOWN, Keys::Down},
 	};
 
 	class Engine
@@ -93,6 +104,6 @@ namespace cpt
 
 		float m_CameraSpeed{ 2.5f };
 
-		std::array<bool, static_cast<size_t>(Keys::TotalKeys)> m_Keys{};
+		std::array<bool, EnumClassValue(Keys::TotalKeys)> m_Keys{};
 	};
 }
