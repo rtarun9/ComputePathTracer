@@ -1,5 +1,7 @@
 #pragma once
 
+#include "graphics_device.hpp"
+
 struct SDL_Window;
 
 namespace cpt
@@ -17,6 +19,8 @@ class Engine
     uint32_t m_windowHeight{};
     SDL_Window *m_window{};
     HWND m_windowHandle{};
+
+    std::unique_ptr<GraphicsDevice> m_graphicsDevice{};
 
     uint32_t m_frameNumber{};
 };

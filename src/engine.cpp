@@ -28,7 +28,10 @@ Engine::Engine(const std::string_view windowTitle, const uint32_t windowWidth, c
 
     SDL_GetWindowWMInfo(m_window, &wmInfo);
     m_windowHandle = wmInfo.info.win.window;
-}
+
+    // Create the graphics device, which in turn will setup the graphics backend.
+    m_graphicsDevice = std::make_unique<GraphicsDevice>(m_windowWidth, m_windowHeight, m_windowHandle);
+}   
 
 Engine::~Engine()
 {

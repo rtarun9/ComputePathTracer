@@ -10,4 +10,12 @@ static inline void fatalError(const std::string_view message,
                                          message, location.line(), location.column(), location.file_name(),
                                          location.function_name()));
 }
+
+static inline void dxCheck(const HRESULT hr, const std::source_location location = std::source_location::current())
+{
+    if (FAILED(hr))
+    {
+        fatalError("HRESULT FAILED!", location);
+    }
+}
 } // namespace cpt::utils
