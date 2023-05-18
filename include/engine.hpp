@@ -15,6 +15,10 @@ class Engine
     void run();
 
   private:
+    void update(const float deltaTime);
+    void render();
+
+  private:
     uint32_t m_windowWidth{};
     uint32_t m_windowHeight{};
     SDL_Window *m_window{};

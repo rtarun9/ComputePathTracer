@@ -22,7 +22,7 @@ Engine::Engine(const std::string_view windowTitle, const uint32_t windowWidth, c
         utils::fatalError("Failed to create SDL2 window");
     }
 
-    // Get window handle.
+    // Get the raw window handle.
     SDL_SysWMinfo wmInfo{};
     SDL_VERSION(&wmInfo.version);
 
@@ -31,7 +31,7 @@ Engine::Engine(const std::string_view windowTitle, const uint32_t windowWidth, c
 
     // Create the graphics device, which in turn will setup the graphics backend.
     m_graphicsDevice = std::make_unique<GraphicsDevice>(m_windowWidth, m_windowHeight, m_windowHandle);
-}   
+}
 
 Engine::~Engine()
 {
@@ -41,6 +41,9 @@ Engine::~Engine()
 
 void Engine::run()
 {
+    std::chrono::high_resolution_clock clock{};
+    std::chrono::high_resolution_clock::time_point previousFrameTimePoint{};
+
     try
     {
         bool quit = false;
@@ -60,6 +63,17 @@ void Engine::run()
                     quit = true;
                 }
             }
+            
+            const auto currentFrameTimePoint = clock.now();
+            const float deltaTime =
+                std::chrono::duration_cast<std::chrono::milliseconds>(currentFrameTimePoint - previousFrameTimePoint)
+                    .count();
+            previousFrameTimePoint = currentFrameTimePoint;
+
+            update(deltaTime);
+            render();
+
+            m_frameNumber++;
         }
     }
     catch (const std::exception &exception)
@@ -69,4 +83,73 @@ void Engine::run()
     }
 }
 
+void Engine::update(const float deltaTime)
+{
+}
+
+void Engine::render()
+{
+    // Reset the command list and associated command allocator for this frame.
+    const uint32_t currentFrameIndex = m_graphicsDevice->m_currentFrameIndex;
+    auto &commandAllocator = m_graphicsDevice->m_commandAllocators[currentFrameIndex];
+    auto &commandList = m_graphicsDevice->m_commandList;
+
+    commandAllocator->Reset();
+    utils::dxCheck(commandList->Reset(commandAllocator.Get(), nullptr));
+
+    // Transition backbuffer from presentation to render target state.
+    const D3D12_RESOURCE_BARRIER presentationToRtBarrier = {
+        .Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+        .Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
+        .Transition =
+            {
+                .pResource = m_graphicsDevice->m_rtvBackBufferResources[currentFrameIndex].Get(),
+                .Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                .StateBefore = D3D12_RESOURCE_STATE_PRESENT,
+                .StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET,
+            },
+    };
+
+    commandList->ResourceBarrier(1u, &presentationToRtBarrier);
+
+    // Clear render target view.
+    const std::array<float, 4> clearColor = {0.2f, 0.2f, std::abs((float)sin(m_frameNumber / 180.0f)), 1.0f};
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle =
+        m_graphicsDevice->m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    rtvDescriptorHandle.ptr += m_graphicsDevice->m_rtvDescriptorHandleIncrementSize * currentFrameIndex;
+
+    commandList->ClearRenderTargetView(rtvDescriptorHandle, clearColor.data(), 0u, nullptr);
+
+    // Transition backbuffer from render target to presentation state.
+    const D3D12_RESOURCE_BARRIER rtToPresentationBarrier = {
+        .Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+        .Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
+        .Transition =
+            {
+                .pResource = m_graphicsDevice->m_rtvBackBufferResources[currentFrameIndex].Get(),
+                .Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                .StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                .StateAfter = D3D12_RESOURCE_STATE_PRESENT,
+            },
+    };
+
+    commandList->ResourceBarrier(1u, &rtToPresentationBarrier);
+
+    // Execute command list.
+    utils::dxCheck(commandList->Close());
+    std::array<ID3D12CommandList *, 1u> commandLists = {
+        commandList.Get(),
+    };
+
+    m_graphicsDevice->m_directCommandQueue->ExecuteCommandLists(1u, commandLists.data());
+    
+    // Present to swapchain.
+    utils::dxCheck(m_graphicsDevice->m_swapchain->Present(1u, 0u));
+
+    m_graphicsDevice->m_frameFenceValues[currentFrameIndex] = m_graphicsDevice->signal();
+
+    // Wait for next frame's resources to be out of reference.
+    m_graphicsDevice->m_currentFrameIndex = m_graphicsDevice->m_swapchain->GetCurrentBackBufferIndex();
+    m_graphicsDevice->waitForFenceValue(m_graphicsDevice->m_frameFenceValues[m_graphicsDevice->m_currentFrameIndex]);
+}
 } // namespace cpt

@@ -11,6 +11,7 @@ target_precompile_headers(${PROJECT_NAME} PUBLIC
     <cstdint>
     <stdexcept>
     <format>
+    <chrono>
     <string_view>
     <memory>
     <vector>
