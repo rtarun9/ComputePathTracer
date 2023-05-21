@@ -115,7 +115,7 @@ void GraphicsDevice::initGraphicsBackend()
     const DXGI_SWAP_CHAIN_DESC1 swapchainDesc = {
         .Width = m_windowWidth,
         .Height = m_windowHeight,
-        .Format = DXGI_FORMAT_R10G10B10A2_UNORM,
+        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
         .Stereo = FALSE,
         .SampleDesc = {1u, 0u},
         .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,

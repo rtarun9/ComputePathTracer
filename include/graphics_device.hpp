@@ -19,9 +19,9 @@ class GraphicsDevice
   public:
     constexpr static inline uint32_t FRAMES_IN_FLIGHT = 3u;
 
-    const uint32_t& m_windowWidth;
-    const uint32_t& m_windowHeight;
-    const HWND& m_windowHandle;
+    const uint32_t &m_windowWidth;
+    const uint32_t &m_windowHeight;
+    const HWND &m_windowHandle;
 
     Microsoft::WRL::ComPtr<ID3D12Debug3> m_debug{};
     Microsoft::WRL::ComPtr<IDXGIFactory6> m_factory{};

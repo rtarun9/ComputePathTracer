@@ -12,13 +12,17 @@ target_precompile_headers(${PROJECT_NAME} PUBLIC
     <stdexcept>
     <format>
     <chrono>
+    <algorithm>
     <string_view>
     <memory>
+    <filesystem>
     <vector>
     <array>
 
     <Windows.h>
+    <DirectXMath.h>
     <wrl.h>
     <d3d12.h>
     <dxgi1_6.h>
+    <d3dcompiler.h>
 )
