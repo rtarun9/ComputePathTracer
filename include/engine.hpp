@@ -6,9 +6,19 @@ struct SDL_Window;
 
 namespace cpt
 {
+struct Sphere
+{
+    DirectX::XMFLOAT3 center{0.0f, 0.0f, 2.0f};
+    float radius{1.0f};
+    DirectX::XMFLOAT3 color{1.0f, 0.0f, 0.5f};
+    float padding{0.0f};
+};
+
 struct alignas(256) GlobalConstantBuffer
 {
     DirectX::XMFLOAT2 screenDimensions{};
+    DirectX::XMFLOAT2 padding{};
+    Sphere sphere{};
 };
 
 class Engine
@@ -41,6 +51,14 @@ class Engine
     GlobalConstantBuffer m_globalCBufferData{};
     uint8_t *m_globalCBufferPtr{};
     uint32_t m_globalCBufferHeapIndex{1u};
+
+    // Imgui will render onto this render target, which will be added ontop of the compute shader output texture.
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_offscreenRT{};
+   
+    uint32_t m_offscreenRTHeapIndexRTV{GraphicsDevice::FRAMES_IN_FLIGHT};
+    uint32_t m_offscreenRTHeapIndexSRV{2u};
+
+    uint32_t m_imguiHeapIndexSRV{3u};
 
     uint32_t m_frameNumber{};
 };

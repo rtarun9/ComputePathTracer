@@ -8,6 +8,13 @@ class GraphicsDevice
     GraphicsDevice(const uint32_t &windowWidth, const uint32_t &windowHeight, const HWND &windowHandle);
     ~GraphicsDevice() = default;
 
+    // Descriptor heap related.
+    D3D12_CPU_DESCRIPTOR_HANDLE getCPUDescriptorHandleAtIndex(const D3D12_DESCRIPTOR_HEAP_TYPE heapType,
+                                                           const uint32_t index);
+
+    D3D12_GPU_DESCRIPTOR_HANDLE getGPUDescriptorHandleAtIndex(const D3D12_DESCRIPTOR_HEAP_TYPE heapType,
+                                                           const uint32_t index);
+
     // Command queue related operations.
     uint64_t signal();
     void waitForFenceValue(const uint64_t fenceValue);

@@ -4,6 +4,10 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
 
+#include <imgui.h>
+#include <imgui_impl_dx12.h>
+#include <imgui_impl_sdl2.h>
+
 namespace cpt
 {
 Engine::Engine(const std::string_view windowTitle, const uint32_t windowWidth, const uint32_t windowHeight)
@@ -71,30 +75,50 @@ Engine::Engine(const std::string_view windowTitle, const uint32_t windowWidth, c
 
     // Create the root signature.
     // A root signature is fairly similar to a function signature, but for the shaders.
-    // The path tracing shader only has two shader inputs : A output RWTexture2D<>, and a global constant buffer.
-    // The UAV will be in a descriptor table, since you cant have RWTexture2D<> as a inline descriptor.
-    const std::array<D3D12_DESCRIPTOR_RANGE1, 1u> descriptorRanges = {
+    // The path tracing shader only has three shader inputs : A output RWTexture2D<>, and a global constant buffer, and
+    // the imgui - offscreen render target. The UAV will be in a descriptor table, since you cant have RWTexture2D<> as
+    // a inline descriptor. Same for the offscreen render target srv.
+    //
+    const std::array<D3D12_DESCRIPTOR_RANGE1, 2u> descriptorRanges = {
         D3D12_DESCRIPTOR_RANGE1{
             .RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
-            .NumDescriptors = 1,
-            .BaseShaderRegister = 0,
-            .RegisterSpace = 0,
+            .NumDescriptors = 1u,
+            .BaseShaderRegister = 0u,
+            .RegisterSpace = 0u,
             .Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE,
-            .OffsetInDescriptorsFromTableStart = 0,
+            .OffsetInDescriptorsFromTableStart = 0u,
         },
+        D3D12_DESCRIPTOR_RANGE1{.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+                                .NumDescriptors = 1u,
+                                .BaseShaderRegister = 0u,
+                                .RegisterSpace = 0u,
+                                .Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE,
+                                .OffsetInDescriptorsFromTableStart = 0u},
     };
 
-    const std::array<D3D12_ROOT_PARAMETER1, 2u> rootParamters = {
+    const std::array<D3D12_ROOT_PARAMETER1, 3u> rootParamters = {
         D3D12_ROOT_PARAMETER1{
+            // For the compute shader output texture.
             .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
             .DescriptorTable =
                 {
                     .NumDescriptorRanges = 1u,
-                    .pDescriptorRanges = descriptorRanges.data(),
+                    .pDescriptorRanges = &descriptorRanges[0],
                 },
             .ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
         },
         D3D12_ROOT_PARAMETER1{
+            // For the offscreen render target output texture.
+            .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+            .DescriptorTable =
+                {
+                    .NumDescriptorRanges = 1u,
+                    .pDescriptorRanges = &descriptorRanges[1],
+                },
+            .ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
+        },
+        D3D12_ROOT_PARAMETER1{
+            // For the global constant buffer.
             .ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV,
             .Descriptor =
                 {
@@ -106,20 +130,37 @@ Engine::Engine(const std::string_view windowTitle, const uint32_t windowWidth, c
         },
     };
 
+    const D3D12_STATIC_SAMPLER_DESC linearClampSamplerDesc = {
+        .Filter = D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR,
+        .AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+        .AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+        .AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+        .ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL,
+        .ShaderRegister = 0u,
+        .RegisterSpace = 0u,
+        .ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL,
+    };
+
     const D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc = {
         .Version = D3D_ROOT_SIGNATURE_VERSION_1_1,
         .Desc_1_1 =
             {
                 .NumParameters = static_cast<uint32_t>(rootParamters.size()),
                 .pParameters = rootParamters.data(),
-                .NumStaticSamplers = 0u,
-                .pStaticSamplers = nullptr,
+                .NumStaticSamplers = 1u,
+                .pStaticSamplers = &linearClampSamplerDesc,
                 .Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE,
             },
     };
 
     Microsoft::WRL::ComPtr<ID3DBlob> rootSignatureBlob{};
-    utils::dxCheck(::D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &rootSignatureBlob, &errorBlob));
+    const HRESULT serializeRootSignatureHresult(
+        ::D3D12SerializeVersionedRootSignature(&rootSignatureDesc, &rootSignatureBlob, &errorBlob));
+    if (FAILED(serializeRootSignatureHresult))
+    {
+        const char *message = (const char *)errorBlob->GetBufferPointer();
+        utils::fatalError(message);
+    }
 
     utils::dxCheck(m_graphicsDevice->m_device->CreateRootSignature(
         0u, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
@@ -180,10 +221,8 @@ Engine::Engine(const std::string_view windowTitle, const uint32_t windowWidth, c
             },
     };
 
-    // The first index (i.e index 0) goes to UAV, and 2nd index (i.e index 1) goes to the CBV.
-    m_computeShaderUAVHeapIndex = 0u;
-    D3D12_CPU_DESCRIPTOR_HANDLE uavCPUDescriptorHandle =
-        m_graphicsDevice->m_cbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    const D3D12_CPU_DESCRIPTOR_HANDLE uavCPUDescriptorHandle = m_graphicsDevice->getCPUDescriptorHandleAtIndex(
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, m_computeShaderUAVHeapIndex);
 
     m_graphicsDevice->m_device->CreateUnorderedAccessView(m_computeShaderOutputTexture.Get(), nullptr, &uavDesc,
                                                           uavCPUDescriptorHandle);
@@ -225,10 +264,8 @@ Engine::Engine(const std::string_view windowTitle, const uint32_t windowWidth, c
     utils::dxCheck(m_globalCBufferResource->Map(0, &readRange, reinterpret_cast<void **>(&m_globalCBufferPtr)));
 
     // Create the constant buffer view.
-    D3D12_CPU_DESCRIPTOR_HANDLE cbufferCPUDescriptorHandle =
-        m_graphicsDevice->m_cbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-    cbufferCPUDescriptorHandle.ptr += m_graphicsDevice->m_cbvSrvUavDescriptorHandleIncrementSize;
-    m_globalCBufferHeapIndex = 1u;
+    const D3D12_CPU_DESCRIPTOR_HANDLE cbufferCPUDescriptorHandle = m_graphicsDevice->getCPUDescriptorHandleAtIndex(
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, m_globalCBufferHeapIndex);
 
     const D3D12_CONSTANT_BUFFER_VIEW_DESC globalCBufferViewDesc = {
         .BufferLocation = m_globalCBufferResource->GetGPUVirtualAddress(),
@@ -236,10 +273,94 @@ Engine::Engine(const std::string_view windowTitle, const uint32_t windowWidth, c
     };
 
     m_graphicsDevice->m_device->CreateConstantBufferView(&globalCBufferViewDesc, cbufferCPUDescriptorHandle);
+
+    // Create the offscreen render target. Must be in the D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE initially, and we
+    // should be able to use it as a render target.
+    const D3D12_RESOURCE_DESC offscreenRTDesc = {
+        .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+        .Alignment = 0u,
+        .Width = m_windowWidth,
+        .Height = m_windowHeight,
+        .DepthOrArraySize = 1u,
+        .MipLevels = 1u,
+        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+        .SampleDesc = {1u, 0u},
+        .Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,
+        .Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+    };
+
+    const D3D12_CLEAR_VALUE optimizedClearValue = {
+        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+        .Color = {0.0f, 0.0f, 0.0f, 1.0f},
+    };
+
+    utils::dxCheck(m_graphicsDevice->m_device->CreateCommittedResource(
+        &heapProperties, D3D12_HEAP_FLAG_NONE, &offscreenRTDesc, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE,
+        &optimizedClearValue, IID_PPV_ARGS(&m_offscreenRT)));
+
+    // Create the render target view.
+    const D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {
+        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+        .ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+        .Texture2D = {.MipSlice = 0u, .PlaneSlice = 0u},
+    };
+
+    const D3D12_CPU_DESCRIPTOR_HANDLE rtvCPUDescriptorHandle =
+        m_graphicsDevice->getCPUDescriptorHandleAtIndex(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, m_offscreenRTHeapIndexRTV);
+
+    m_graphicsDevice->m_device->CreateRenderTargetView(m_offscreenRT.Get(), &rtvDesc, rtvCPUDescriptorHandle);
+
+    // Create the shader resource view.
+    const D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {
+        .Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+        .ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D,
+        .Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+        .Texture2D =
+            {
+                .MostDetailedMip = 0u,
+                .MipLevels = 1u,
+                .PlaneSlice = 0u,
+            },
+    };
+
+    const D3D12_CPU_DESCRIPTOR_HANDLE offscreenRTSrvCPUDescriptorHandle =
+        m_graphicsDevice->getCPUDescriptorHandleAtIndex(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                                                        m_offscreenRTHeapIndexSRV);
+
+    m_graphicsDevice->m_device->CreateShaderResourceView(m_offscreenRT.Get(), &srvDesc,
+                                                         offscreenRTSrvCPUDescriptorHandle);
+
+    // Setup ImGui.
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
+    ImGui::StyleColorsDark();
+
+    // ImGui will utilize the last CPU/GPU descriptor handle.
+    const D3D12_GPU_DESCRIPTOR_HANDLE imguiSrvGPUDescriptorHandle =
+        m_graphicsDevice->getGPUDescriptorHandleAtIndex(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, m_imguiHeapIndexSRV);
+
+    const D3D12_CPU_DESCRIPTOR_HANDLE imguiSrvCPUDescriptorHandle =
+        m_graphicsDevice->getCPUDescriptorHandleAtIndex(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, m_imguiHeapIndexSRV);
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplSDL2_InitForD3D(m_window);
+    ImGui_ImplDX12_Init(m_graphicsDevice->m_device.Get(), GraphicsDevice::FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM,
+                        m_graphicsDevice->m_cbvSrvUavDescriptorHeap.Get(), imguiSrvCPUDescriptorHandle,
+                        imguiSrvGPUDescriptorHandle);
 }
 
 Engine::~Engine()
 {
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+
     SDL_DestroyWindow(m_window);
     SDL_Quit();
 }
@@ -257,6 +378,8 @@ void Engine::run()
             SDL_Event event{};
             while (SDL_PollEvent(&event))
             {
+                ImGui_ImplSDL2_ProcessEvent(&event);
+
                 if (event.type == SDL_QUIT)
                 {
                     quit = true;
@@ -294,6 +417,7 @@ void Engine::update(const float deltaTime)
         (float)m_windowWidth,
         (float)m_windowHeight,
     };
+
     memcpy(m_globalCBufferPtr, reinterpret_cast<void *>(&m_globalCBufferData), sizeof(GlobalConstantBuffer));
 }
 
@@ -333,18 +457,33 @@ void Engine::render()
             },
     };
 
-    const std::array<D3D12_RESOURCE_BARRIER, 2u> initialBatchedResourceBarriers = {
+    // Transition offscreen render target to RT from All_shader_resource.
+    const D3D12_RESOURCE_BARRIER shaderResourceToRenderTargetBarrier = {
+        .Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+        .Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
+        .Transition =
+            {
+                .pResource = m_offscreenRT.Get(),
+                .Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                .StateBefore = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE,
+                .StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET,
+            },
+    };
+
+    const std::array<D3D12_RESOURCE_BARRIER, 3u> initialBatchedResourceBarriers = {
         presentToCopyDestBarrier,
         copySrvToUavBarrier,
+        shaderResourceToRenderTargetBarrier,
     };
 
     commandList->ResourceBarrier(static_cast<uint32_t>(initialBatchedResourceBarriers.size()),
                                  initialBatchedResourceBarriers.data());
 
-    // Dispatch Calls.
-    // Set necessary state.
-    commandList->SetComputeRootSignature(m_rootSignature.Get());
-    commandList->SetPipelineState(m_pipelineState.Get());
+    const D3D12_CPU_DESCRIPTOR_HANDLE offscreenRtDescriptorHandle =
+        m_graphicsDevice->getCPUDescriptorHandleAtIndex(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, m_offscreenRTHeapIndexRTV);
+
+    constexpr std::array<const float, 4> clearColor{0.0f, 0.0f, 0.0f, 1.0f};
+    commandList->ClearRenderTargetView(offscreenRtDescriptorHandle, clearColor.data(), 0u, nullptr);
 
     const std::array<ID3D12DescriptorHeap *, 1u> shaderVisibleDescriptorHeaps = {
         m_graphicsDevice->m_cbvSrvUavDescriptorHeap.Get(),
@@ -352,11 +491,50 @@ void Engine::render()
     commandList->SetDescriptorHeaps(static_cast<uint32_t>(shaderVisibleDescriptorHeaps.size()),
                                     shaderVisibleDescriptorHeaps.data());
 
-    auto cbvSrvUavGPUDescriptor = m_graphicsDevice->m_cbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+    // Render Imgui.
+    ImGui_ImplDX12_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+   
+    ImGui::SliderFloat3("Sphere Center", &m_globalCBufferData.sphere.center.x, -1.0f, 1.0f);
+    ImGui::SliderFloat("Sphere Radius", &m_globalCBufferData.sphere.radius, 0.1f, 10.0f);
+    ImGui::ColorPicker3("Sphere Color", &m_globalCBufferData.sphere.color.x);
 
-    commandList->SetComputeRootDescriptorTable(0u, cbvSrvUavGPUDescriptor);
+    ImGui::Render();
+    commandList->OMSetRenderTargets(1u, &offscreenRtDescriptorHandle, false, nullptr);
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
 
-    commandList->SetComputeRootConstantBufferView(1u, m_globalCBufferResource->GetGPUVirtualAddress());
+    // Transition offscreen render target to all shader resource.
+    const D3D12_RESOURCE_BARRIER renderTargetToAllShaderResource = {
+        .Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+        .Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
+        .Transition =
+            {
+                .pResource = m_offscreenRT.Get(),
+                .Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                .StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                .StateAfter = D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE,
+            },
+    };
+
+    commandList->ResourceBarrier(1u, &renderTargetToAllShaderResource);
+
+    // Dispatch Calls.
+    // Set necessary state.
+    commandList->SetComputeRootSignature(m_rootSignature.Get());
+    commandList->SetPipelineState(m_pipelineState.Get());
+
+    const D3D12_GPU_DESCRIPTOR_HANDLE computeShaderOutputGPUDescriptor =
+        m_graphicsDevice->getGPUDescriptorHandleAtIndex(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                                                        m_computeShaderUAVHeapIndex);
+    commandList->SetComputeRootDescriptorTable(0u, computeShaderOutputGPUDescriptor);
+
+    const D3D12_GPU_DESCRIPTOR_HANDLE offscreenRTGPUDescriptor = m_graphicsDevice->getGPUDescriptorHandleAtIndex(
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, m_offscreenRTHeapIndexSRV);
+
+    commandList->SetComputeRootDescriptorTable(1u, offscreenRTGPUDescriptor);
+
+    commandList->SetComputeRootConstantBufferView(2u, m_globalCBufferResource->GetGPUVirtualAddress());
 
     const uint32_t dispatchX = std::max<uint32_t>(m_windowWidth / 12u, 1u);
     const uint32_t dispatchY = std::max<uint32_t>(m_windowHeight / 8u, 1u);
@@ -414,6 +592,9 @@ void Engine::render()
     };
 
     m_graphicsDevice->m_directCommandQueue->ExecuteCommandLists(1u, commandLists.data());
+
+    ImGui::UpdatePlatformWindows();
+    ImGui::RenderPlatformWindowsDefault();
 
     // Present to swapchain.
     utils::dxCheck(m_graphicsDevice->m_swapchain->Present(1u, 0u));

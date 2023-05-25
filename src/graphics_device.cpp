@@ -10,6 +10,49 @@ GraphicsDevice::GraphicsDevice(const uint32_t &windowWidth, const uint32_t &wind
     initGraphicsBackend();
 }
 
+// Descriptor heap operations.
+D3D12_CPU_DESCRIPTOR_HANDLE GraphicsDevice::getCPUDescriptorHandleAtIndex(const D3D12_DESCRIPTOR_HEAP_TYPE heapType,
+                                                                          const uint32_t index)
+{
+    if (heapType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE cbvSrvUavHandle = m_cbvSrvUavDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+        cbvSrvUavHandle.ptr += m_cbvSrvUavDescriptorHandleIncrementSize * index;
+
+        return cbvSrvUavHandle;
+    }
+    else if (heapType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV)
+    {
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+        rtvHandle.ptr += m_rtvDescriptorHandleIncrementSize * index;
+
+        return rtvHandle;
+    }
+
+    return {};
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE GraphicsDevice::getGPUDescriptorHandleAtIndex(const D3D12_DESCRIPTOR_HEAP_TYPE heapType,
+                                                                          const uint32_t index)
+{
+    if (heapType == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
+    {
+        D3D12_GPU_DESCRIPTOR_HANDLE cbvSrvUavHandle = m_cbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+        cbvSrvUavHandle.ptr += m_cbvSrvUavDescriptorHandleIncrementSize * index;
+
+        return cbvSrvUavHandle;
+    }
+    else if (heapType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV)
+    {
+        D3D12_GPU_DESCRIPTOR_HANDLE rtvHandle = m_rtvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+        rtvHandle.ptr += m_rtvDescriptorHandleIncrementSize * index;
+
+        return rtvHandle;
+    }
+
+    return {};
+}
+
 // Command queue related operations.
 uint64_t GraphicsDevice::signal()
 {
@@ -153,7 +196,7 @@ void GraphicsDevice::initGraphicsBackend()
 
     const D3D12_DESCRIPTOR_HEAP_DESC rtvDescriptorHeapDesc = {
         .Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-        .NumDescriptors = 3u,
+        .NumDescriptors = 4u,
         .Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
         .NodeMask = 0u,
     };
